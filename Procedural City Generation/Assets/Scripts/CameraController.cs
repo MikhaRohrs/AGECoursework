@@ -1,6 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
-using Unity.PlasticSCM.Editor.WebApi;
 using UnityEngine;
 
 public class CameraController : MonoBehaviour
@@ -25,7 +22,7 @@ public class CameraController : MonoBehaviour
     void Start()
     {
         Cursor.visible = false;
-        Cursor.lockState = CursorLockMode.Locked;
+        //Cursor.lockState = CursorLockMode.Locked;
     }
 
     void Update () {
@@ -33,6 +30,11 @@ public class CameraController : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.C))
         {
             Cursor.visible = !Cursor.visible;
+        }
+
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            Application.Quit();
         }
 
         lastMouse = Input.mousePosition - lastMouse ;
@@ -43,7 +45,7 @@ public class CameraController : MonoBehaviour
         //Mouse  camera angle done.  
        
         //Keyboard commands
-        float f = 0.0f;
+        //float f = 0.0f;
         Vector3 p = GetBaseInput();
         if (p.sqrMagnitude > 0){ // only move while a direction key is pressed
           if (Input.GetKey (KeyCode.LeftShift)){

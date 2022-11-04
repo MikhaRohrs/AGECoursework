@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -71,6 +70,10 @@ public class CityGenerator : MonoBehaviour
     // If G is pressed, destroy any existing buildings and generate a new city
     private void Update()
     {
+        if (Input.GetKeyDown(KeyCode.M))
+        {
+            _useManhattanDistance = !_useManhattanDistance;
+        }
         if (!Input.GetKeyDown((KeyCode.G))) return;
         foreach (var building in _generatedBuildings)
         {

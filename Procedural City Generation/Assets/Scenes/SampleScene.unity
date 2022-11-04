@@ -158,7 +158,7 @@ MonoBehaviour:
   _seed: 0
   _useManhattanDistance: 1
   _blockSize: 8
-  _majorRoadThickness: 1
+  _majorRoadThickness: 0
   _buildings:
   - {fileID: 7242161934439189104, guid: 2d4ba34f3adcbf345af285ce6d936f8f, type: 3}
   - {fileID: 5748409985654758922, guid: 723915919fe86cb439e5784ce1f5c0ce, type: 3}
