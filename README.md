@@ -3,8 +3,9 @@
 ## Info
 - Press G to generate a city
 - Press M to enable/disable using Manhattan distance (you will need to re-generate to see results)
+- Press C to show mouse cursor
+- Press ESC to exit
 - Colour codes for buildings: Black = road, White = residential, Green = park, Red = industrial, Yellow = market, Grey = business
-- Press escape to show mouse cursor
 - If using editor make sure the road thickness element in the city generator game object is set to 0
 
 ## Rubric
