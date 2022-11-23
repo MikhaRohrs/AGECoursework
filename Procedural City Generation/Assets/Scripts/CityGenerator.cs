@@ -35,6 +35,16 @@ public class CityGenerator : MonoBehaviour
         public const int Business = 5;
     }
 
+    private enum VoronoiCellType 
+    {
+        Road,
+        Residential,
+        Park,
+        Industrial,
+        Market,
+        Business
+    }
+
     // This struct stores a pixel in a Voronoi diagram texture's position and colour, 
     // so that the diagram can be stored as a 2D array rather than a texture.
     private struct VoronoiPoint
