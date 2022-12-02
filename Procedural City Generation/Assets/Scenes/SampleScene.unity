@@ -152,20 +152,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 645b6e10b330fc0478d7b7ecaabfe3e2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _rectBoundaries: {x: 120, y: 120}
-  _minCells: 50
-  _maxCells: 100
-  _seed: 0
-  _useManhattanDistance: 1
-  _blockSize: 8
-  _majorRoadThickness: 0
-  _buildings:
+  rectBoundaries: {x: 100, y: 100}
+  numOfCells: 30
+  seed: 0
+  useManhattanDistance: 1
+  blockSize: 4
+  buildingScale: 25
+  buildings:
   - {fileID: 7242161934439189104, guid: 2d4ba34f3adcbf345af285ce6d936f8f, type: 3}
-  - {fileID: 1600722264159988, guid: 445da40af79ed8241871555db3d63e27, type: 3}
+  - {fileID: 1164899596817984, guid: ba33f5f0a254c9443956b40146028648, type: 3}
   - {fileID: 314083429038413604, guid: 158560fbb4b7fb94781f247426b25015, type: 3}
+  - {fileID: 1646639913439324, guid: ac16a24c584766f4e905adc7db85b93d, type: 3}
   - {fileID: 1737964153803582, guid: 9094aa5ae2e324346997aa2ea9ad7930, type: 3}
-  - {fileID: 1213795830858570, guid: 9a52ba64c3a0abf49ad9515917ade04b, type: 3}
-  - {fileID: 1631595132073662, guid: 2c1f60045e2f58f48966f8cea8354944, type: 3}
+  - {fileID: 1899946360806954, guid: 7d569c6acdec3c2428d7b39889d89720, type: 3}
 --- !u!4 &48515430
 Transform:
   m_ObjectHideFlags: 0
@@ -369,6 +368,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ba70cf9702a7540469d3b330fa1ee3ab, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  mainSpeed: 100
-  shiftAdd: 250
+  mainSpeed: 10
+  shiftAdd: 10
   camSens: 0.25

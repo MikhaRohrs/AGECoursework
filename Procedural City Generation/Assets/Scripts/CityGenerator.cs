@@ -1,40 +1,33 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
+using UnityEngine.Serialization;
+using Random = UnityEngine.Random;
 
 public class CityGenerator : MonoBehaviour
 {
+    // 'Public' variables (set in editor)
     [Tooltip("Size of the city as a square")]
-    [SerializeField] private Vector2Int _rectBoundaries;
+    [SerializeField] private Vector2Int rectBoundaries;
+    
+    [Tooltip("Number of districts / regions")]
+    [SerializeField] private int numOfCells;
 
-    [Tooltip("Minimum number of districts / regions")]
-    [SerializeField] private int _minCells;
-    [Tooltip("Maximum number of districts / regions")]
-    [SerializeField] private int _maxCells;
-
-    [SerializeField] private int _seed;
-
+    [FormerlySerializedAs("_seed")] [SerializeField] private int seed;
+    
     [Tooltip("Changes metric for determining distances from Euclidean to Manhattan")]
-    [SerializeField] private bool _useManhattanDistance;
-
+    [SerializeField] private bool useManhattanDistance;
+    
     [Tooltip("The number of buildings a city block will comprise of")]
-    [SerializeField] private int _blockSize;
+    [SerializeField] private int blockSize;
 
-    [Tooltip("0 means major roads are 1 block tick.")]
-    [SerializeField] private int _majorRoadThickness;
-
+    [Tooltip("Set building scale (1 == default size, this is too large)")]
+    [SerializeField] private float buildingScale;
+    
     [Tooltip("0 = Road, 1 = Residential, 2 = Park, 3 = Industrial, 4 = Market, 5 = Business")]
-    [SerializeField] private GameObject[] _buildings = new GameObject[6];
-
-    private struct Buildings
-    {
-        public const int Road = 0;
-        public const int Residential = 1;
-        public const int Park = 2;
-        public const int Industrial = 3;
-        public const int Market = 4;
-        public const int Business = 5;
-    }
-
+    [SerializeField] private GameObject[] buildings = new GameObject[6];
+    
     private enum VoronoiCellType 
     {
         Road,
@@ -49,40 +42,44 @@ public class CityGenerator : MonoBehaviour
     // so that the diagram can be stored as a 2D array rather than a texture.
     private struct VoronoiPoint
     {
-        public VoronoiPoint(Vector2Int position, Color colour)
+        public VoronoiPoint(Vector2Int position, VoronoiCellType pointType)
         {
             this.Position = position;
-            this.Colour = colour;
-            this.IsRoad = false;
+            this.PointType = pointType;
         }
 
-        private Vector2Int Position { get; }
+        private Vector2Int Position { get; set; }
 
-        public Color Colour { get; }
-
-        public bool IsRoad { get; set; }
+        public VoronoiCellType PointType { get; set; }
     }
 
     private VoronoiPoint[,] _voronoiAs2DArray;
 
-    private readonly List<GameObject> _generatedBuildings = new List<GameObject>();
+    private List<GameObject> _generatedBuildings = new List<GameObject>();
 
-    // END OF VARIABLES
+    // ***END OF VARIABLES***
 
     // Set random generator seed and initialise 2D array for storing the voronoi diagram
     private void Start()
     {
-        Random.InitState(_seed);
-        _voronoiAs2DArray = new VoronoiPoint[_rectBoundaries.x, _rectBoundaries.y];
+        Random.InitState(seed);
+        _voronoiAs2DArray = new VoronoiPoint[rectBoundaries.x, rectBoundaries.y];
+        
+        var plane = Instantiate(buildings[(int)VoronoiCellType.Road], 
+            new Vector3(rectBoundaries.x / 2.0f, 0, rectBoundaries.y / 2.0f), Quaternion.identity);
+        
+        plane.transform.localScale = new Vector3(rectBoundaries.x, 0.001f, rectBoundaries.y);
+        
         Debug.Log("Press G to generate");
     }
 
-    // If G is pressed, destroy any existing buildings and generate a new city
+    // If G is pressed, destroy any existing buildings and generate a new city.
+    // If M is pressed, enable / disable using Manhattan distance.
     private void Update()
     {
         if (Input.GetKeyDown(KeyCode.M))
         {
-            _useManhattanDistance = !_useManhattanDistance;
+            useManhattanDistance = !useManhattanDistance;
         }
         if (!Input.GetKeyDown((KeyCode.G))) return;
         foreach (var building in _generatedBuildings)
@@ -96,116 +93,140 @@ public class CityGenerator : MonoBehaviour
     // The "Main" function
     private void CreateCity()
     {
-        var regionAmount = Random.Range(_minCells, _maxCells);
-        //Debug.Log(regionAmount);
-        var points = new Vector2Int[regionAmount];
-        var regionColors = new Color[regionAmount];
+        // Stores a point's coordinates and the type of cell it is in.
+        var points = new Tuple<Vector2Int, VoronoiCellType>[numOfCells];
+        var enumMax = (int)Enum.GetValues(typeof(VoronoiCellType)).Cast<VoronoiCellType>().Last();
 
         // Generates points in the Voronoi diagram
-        for (var i = 0; i < regionAmount; i++)
+        for (var i = 0; i < numOfCells; i++)
         {
-            points[i] = new Vector2Int(Random.Range(0, _rectBoundaries.x), Random.Range(0, _rectBoundaries.y));
-
-            var randomColour = Random.Range(0, 5);
-            regionColors[i] = randomColour switch
-            {
-                0 => // RESIDENTIAL - WHITE
-                    Color.white,
-                1 => // PARK - GREEN
-                    Color.green,
-                2 => // INDUSTRIAL - RED
-                    Color.red,
-                3 => // MARKET - YELLOW
-                    Color.yellow,
-                4 => // BUSINESS - GREY
-                    Color.grey,
-                _ => Color.clear
-            };
+            points[i] = Tuple.Create(new Vector2Int(Random.Range(0, rectBoundaries.x), Random.Range(0, rectBoundaries.y)),
+                    (VoronoiCellType)Random.Range(1, enumMax + 1));
         }
 
         // Go through every pixel and assign it a colour based on the closest point
-        for (var x = 0; x < _rectBoundaries.x; x++)
+        for (var x = 0; x < rectBoundaries.x; x++)
         {
-            for (var y = 0; y < _rectBoundaries.y; y++)
+            for (var y = 0; y < rectBoundaries.y; y++)
             {
-                _voronoiAs2DArray[x, y] = new VoronoiPoint(new Vector2Int(x, y),
-                regionColors[GetClosestPointIndex(new Vector2Int(x, y), points)]);
+                var currentPosition = new Vector2Int(x, y);
+                var currentRegion = GetClosestPointType(currentPosition, points);
+                _voronoiAs2DArray[x, y] = new VoronoiPoint(currentPosition, currentRegion);
 
-                var currentColour = _voronoiAs2DArray[x, y].Colour;
 
                 // Check surrounding pixels to see if any of them are a different colour to itself.
-                // If so, that pixel, must be a border pixel, which should be a road.s
-                if ((x - 1) < 0)
+                // If so, that pixel, must be a border pixel, which should be a road.
+                if (x - 1 < 0)
                 {
                     x = 1;
                 }
-                if ((y - 1) < 0)
+                if (y - 1 < 0)
                 {
                     y = 1;
                 }
 
-                if ((_voronoiAs2DArray[x - 1, y].Colour != currentColour ||
-                     _voronoiAs2DArray[x, y - 1].Colour != currentColour ||
-                     _voronoiAs2DArray[x - 1, y - 1].Colour != currentColour))
+                var prevX = _voronoiAs2DArray[x - 1, y].PointType;
+                var prevY = _voronoiAs2DArray[x, y - 1].PointType;
+                var prevXY = _voronoiAs2DArray[x - 1, y - 1].PointType;
+                if (prevX != VoronoiCellType.Road && prevY != VoronoiCellType.Road && prevXY != VoronoiCellType.Road)
                 {
-                    _voronoiAs2DArray[x, y].IsRoad = true;
+                    if ((prevX != currentRegion || prevY != currentRegion || prevXY != currentRegion))
+                    {
+                        _voronoiAs2DArray[x, y].PointType = VoronoiCellType.Road;
+                    }
                 }
             }
         }
-        // Supposed to make major roads bigger
-        for (var i = 1; i <= _majorRoadThickness; i++)
-        {
-            MajorRoadThickener();
-        }
-        // Creates smaller roads and also instantiates all buildings
         SubBlockGenerator();
     }
 
-    // Similar to code checking for neighboring districts, but instead 
-    private void MajorRoadThickener()
+
+    private void SubBlockGenerator()
     {
-        for (var x = 0; x < _rectBoundaries.x; x++)
+        for (var x = 0; x < rectBoundaries.x; x++)
         {
-            for (var y = 0; y < _rectBoundaries.y; y++)
+            for (var y = 0; y < rectBoundaries.y; y++)
             {
-                if ((x - 1) < 0)
+                // Creates roads for smaller blocks (unless its on a park)
+                if ((x % blockSize) == 0 && _voronoiAs2DArray[x,y].PointType != VoronoiCellType.Park)
                 {
-                    x = 1;
+                    _voronoiAs2DArray[x, y].PointType = VoronoiCellType.Road;
                 }
 
-                if ((y - 1) < 0)
+                if ((y % blockSize) == 0 && _voronoiAs2DArray[x,y].PointType != VoronoiCellType.Park)
                 {
-                    y = 1;
+                    _voronoiAs2DArray[x, y].PointType = VoronoiCellType.Road;
                 }
-
-                var currentIsRoad = _voronoiAs2DArray[x, y].IsRoad;
-                if ((_voronoiAs2DArray[x - 1, y].IsRoad ||
-                     _voronoiAs2DArray[x, y - 1].IsRoad ||
-                     _voronoiAs2DArray[x - 1, y - 1].IsRoad) && !currentIsRoad)
-                {
-                    _voronoiAs2DArray[x, y].IsRoad = true;
-                }
+                InstantiateBuildings(x, y, _voronoiAs2DArray[x,y].PointType);
             }
         }
     }
 
-    private void SubBlockGenerator()
+    // Find buildings that neighbour roads and rotate them, if that road is diagonal
+    /*
+     * [][][][r] ->x
+     * [][][r][] |
+     * [][r][][] V
+     * [r][][][] +y
+     * if: diagonal up-right is different AND diagonal down-left is the same AND (Below OR Left is the same)
+     * rotate diagonal up-left
+     * else if: diagonal up-left is different AND diagonal down-right is the same AND (Below OR Left is the same)
+     * rotate diagonal up-right
+     */
+    private void BuildingRotator()
     {
-        for (var x = 0; x < _rectBoundaries.x; x++)
+        for (var y = 0; y < rectBoundaries.y; y++)
         {
-            for (var y = 0; y < _rectBoundaries.y; y++)
+            for (var x = 0; x < rectBoundaries.x; x++)
             {
-                // Creates roads for smaller blocks (unless its on a park)
-                if ((x % _blockSize) == 0 && _voronoiAs2DArray[x,y].Colour != Color.green)
+                var index = x + y;
+                // bounds checks
+                if (x - 1 < 0)
                 {
-                    _voronoiAs2DArray[x, y].IsRoad = true;
+                    x = 1;
                 }
+                if (x + 1 > rectBoundaries.x)
+                {
+                    x = rectBoundaries.x - 1;
+                }
+                if (y - 1 < 0)
+                {
+                    y = 1;
+                }
+                if (y + 1 > rectBoundaries.y)
+                {
+                    y = rectBoundaries.y - 1;
+                }
+                
+                // Case where road is diagonal up-left
+                var currentRegion = _voronoiAs2DArray[x, y].PointType;
+                Debug.Log((x - 1) + " " + (y + 1));
+                // TODO fix this, these are out of bounds when at rect boundaries for some reason
+                var diagDownLeft = _voronoiAs2DArray[x - 1, y + 1].PointType;
+                var diagUpRight = _voronoiAs2DArray[x + 1, y - 1].PointType;
+                
+                var above = _voronoiAs2DArray[x, y - 1].PointType;
+                var right = _voronoiAs2DArray[x + 1, y].PointType;
+                
+                if (diagDownLeft != currentRegion && diagUpRight == currentRegion &&
+                    (above == currentRegion || right == currentRegion))
+                {
+                    // Rotate up-left
+                    Debug.Log("Got to 'rotate up-left'");
+                    _generatedBuildings[index].transform.Rotate(new Vector3(0, 1, 0), 45.0f);
+                }
+                
+                var diagDownRight = _voronoiAs2DArray[x + 1, y + 1].PointType;
+                var diagUpLeft = _voronoiAs2DArray[x - 1, y - 1].PointType;
+                var left = _voronoiAs2DArray[x - 1, y].PointType;
 
-                if ((y % _blockSize) == 0 && _voronoiAs2DArray[x, y].Colour != Color.green)
+                if (diagDownRight != currentRegion && diagUpLeft == currentRegion &&
+                    (above == currentRegion || left == currentRegion))
                 {
-                    _voronoiAs2DArray[x, y].IsRoad = true;
+                    // Rotate up-right
+                    Debug.Log("Got to 'rotate up-right'");
+                    _generatedBuildings[index].transform.Rotate(new Vector3(0, 1, 0), 45.0f);
                 }
-                InstantiateBuildings(x, y, _voronoiAs2DArray[x,y].Colour);
             }
         }
     }
@@ -216,90 +237,97 @@ public class CityGenerator : MonoBehaviour
         return distance;
     }
 
-    // Takes a pixel and finds the closest point. Can use either Euclidean or Manhattan distance
-    private int GetClosestPointIndex(Vector2Int pixelPosition, Vector2Int[] points)
+    // Takes a pixel and finds the closest point and it's type (region / district). Can use either Euclidean or Manhattan distance
+    private VoronoiCellType GetClosestPointType(Vector2Int pixelPosition, Tuple<Vector2Int, VoronoiCellType>[] points)
     {
         var smallestDistance = float.MaxValue;
         var index = 0;
         for (var i = 0; i < points.Length; i++)
         {
-            if (_useManhattanDistance)
+            if (useManhattanDistance)
             {
-                if (!(ManhattanDistance(pixelPosition, points[i]) < smallestDistance)) continue;
-                smallestDistance = ManhattanDistance(pixelPosition, points[i]);
+                if (!(ManhattanDistance(pixelPosition, points[i].Item1) < smallestDistance)) continue;
+                smallestDistance = ManhattanDistance(pixelPosition, points[i].Item1);
             }
             else
             {
-                if (!(Vector2.Distance(pixelPosition, points[i]) < smallestDistance)) continue;
-                smallestDistance = Vector2.Distance(pixelPosition, points[i]);
+                if (!(Vector2.Distance(pixelPosition, points[i].Item1) < smallestDistance)) continue;
+                smallestDistance = Vector2.Distance(pixelPosition, points[i].Item1);
             }
 
             index = i;
         }
 
-        return index;
+        return points[index].Item2;
     }
 
-    private void InstantiateBuildings(int x, int y, Color colour)
+    private void InstantiateBuildings(int x, int y, VoronoiCellType region)
     {
         var position3D = new Vector3(x, 0, y);
         var building = new GameObject();
-        if (_voronoiAs2DArray[x, y].IsRoad)
+        if (_voronoiAs2DArray[x, y].PointType == VoronoiCellType.Road)
         {
-            building = Instantiate(_buildings[Buildings.Road], position3D, Quaternion.identity);
-            _generatedBuildings.Add(building);
+            //building = Instantiate(buildings[(int)VoronoiCellType.Road], position3D, Quaternion.identity);
+            //_generatedBuildings.Add(building);
         }
         else
         {
-            var randomHeight = Random.Range(1.0f, 10.0f);
-            if (colour == Color.white)
+            switch (region)
             {
-                building = Instantiate(_buildings[Buildings.Residential], position3D, Quaternion.identity);
+                case VoronoiCellType.Residential:
+                    building = Instantiate(buildings[(int)VoronoiCellType.Residential], position3D, Quaternion.identity);
+                    break;
+                case VoronoiCellType.Park:
+                    building = Instantiate(buildings[(int)VoronoiCellType.Park], position3D, Quaternion.identity);
+                    _generatedBuildings.Add(building);
+                    return;
+                case VoronoiCellType.Industrial:
+                    building = Instantiate(buildings[(int)VoronoiCellType.Industrial], position3D, Quaternion.identity);
+                    break;
+                // 75% market, 20% residential, 5% business
+                case VoronoiCellType.Market:
+                {
+                    var temp = Random.Range(0.0f, 1.0f);
+                    if (temp <= 0.75f)
+                    {
+                        building = Instantiate(buildings[(int)VoronoiCellType.Market], position3D, Quaternion.identity);
+                    }
+                    else if (temp > 0.75f && temp <= 0.9f)
+                    {
+                        building = Instantiate(buildings[(int)VoronoiCellType.Residential], position3D, Quaternion.identity);
+                    }
+                    else
+                    {
+                        building = Instantiate(buildings[(int)VoronoiCellType.Business], position3D, Quaternion.identity);
+                    }
+
+                    break;
+                }
+                // 75% business, 20% market, 5% residential
+                case VoronoiCellType.Business:
+                {
+                    var temp = Random.Range(0.0f, 1.0f);
+                    if (temp <= 0.75f)
+                    {
+                        building = Instantiate(buildings[(int)VoronoiCellType.Business], position3D, Quaternion.identity);
+                    }
+                    else if (temp > 0.75f && temp <= 0.9f)
+                    {
+                        building = Instantiate(buildings[(int)VoronoiCellType.Market], position3D, Quaternion.identity);
+                    }
+                    else
+                    {
+                        building = Instantiate(buildings[(int)VoronoiCellType.Residential], position3D, Quaternion.identity);
+                    }
+
+                    break;
+                }
             }
-            else if (colour == Color.green)
+            // building.transform.position += new Vector3(0, randomHeight / 2, 0);
+            if (buildingScale > 0)
             {
-                building = Instantiate(_buildings[Buildings.Park], position3D, Quaternion.identity);
-                _generatedBuildings.Add(building);
-                return;
+                building.transform.localScale = transform.localScale / buildingScale;
             }
-            else if (colour == Color.red)
-            {
-                building = Instantiate(_buildings[Buildings.Industrial], position3D, Quaternion.identity);
-            }
-            else if (colour == Color.yellow) // 75% market, 20% residential, 5% business
-            {
-                var temp = Random.Range(0.0f, 1.0f);
-                if (temp <= 0.75f)
-                {
-                    building = Instantiate(_buildings[Buildings.Market], position3D, Quaternion.identity);
-                }
-                else if (temp > 0.75f && temp <= 0.9f)
-                {
-                    building = Instantiate(_buildings[Buildings.Residential], position3D, Quaternion.identity);
-                }
-                else
-                {
-                    building = Instantiate(_buildings[Buildings.Business], position3D, Quaternion.identity);
-                }
-            }
-            else if (colour == Color.grey) // 75% business, 20% market, 5% residential
-            {
-                var temp = Random.Range(0.0f, 1.0f);
-                if (temp <= 0.75f)
-                {
-                    building = Instantiate(_buildings[Buildings.Business], position3D, Quaternion.identity);
-                }
-                else if (temp > 0.75f && temp <= 0.9f)
-                {
-                    building = Instantiate(_buildings[Buildings.Market], position3D, Quaternion.identity);
-                }
-                else
-                {
-                    building = Instantiate(_buildings[Buildings.Residential], position3D, Quaternion.identity);
-                }
-            }
-            building.transform.position += new Vector3(0, randomHeight / 2, 0);
-            building.transform.localScale += new Vector3(0, randomHeight, 0);
             _generatedBuildings.Add(building);
         }
     }
